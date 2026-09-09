@@ -92,6 +92,9 @@
 
   .modes input { position: absolute; opacity: 0; pointer-events: none; }
 
+  /* The video-clip option sits on its own row. */
+  #modes label:last-child { grid-column: 1 / -1; }
+
   .modes label:has(input:checked) {
     background: var(--accent);
     color: var(--accent-ink);
@@ -157,6 +160,44 @@
   #stage.go      { background: #15803d; color: #dcfce7; }
   #stage.tooSoon { background: #b91c1c; color: #fee2e2; }
   #stage.result  { background: var(--bg); color: var(--text); }
+
+  /* ---------- Video-clip cue ---------- */
+  .cue-video {
+    display: none;
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    max-width: 100%;
+    max-height: 100%;
+    background: #000;
+  }
+
+  #stage.has-video {
+    position: relative;
+    background: #000;
+    color: var(--text);
+  }
+
+  /* The clip's motion is the cue, so the stage never flashes red/green here. */
+  #stage.has-video.waiting,
+  #stage.has-video.go,
+  #stage.has-video.tooSoon,
+  #stage.has-video.result { background: #000; }
+
+  #stage.has-video .cue-video { display: block; }
+
+  #stage.has-video .stage-main,
+  #stage.has-video .stage-sub {
+    position: relative;
+    z-index: 1;
+  }
+
+  #stage.has-video .stage-main,
+  #stage.has-video .stage-sub,
+  #stage.has-video .counter {
+    z-index: 2;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9);
+  }
 
   .stage-main {
     font-size: clamp(2rem, 9vw, 4rem);
@@ -268,6 +309,7 @@
           <label><input type="radio" name="mode" value="audio"> Audio</label>
           <label><input type="radio" name="mode" value="both"> Both at once</label>
           <label><input type="radio" name="mode" value="random"> Random mix</label>
+          <label><input type="radio" name="mode" value="video"> Referee view</label>
         </div>
       </fieldset>
 
@@ -276,6 +318,7 @@
         <li><strong>Audio:</strong> the screen stays dark &mdash; tap when you hear the whistle.</li>
         <li><strong>Both:</strong> green flash and beep together.</li>
         <li><strong>Random mix:</strong> each trial is independently visual, audio, or both.</li>
+        <li><strong>Referee view:</strong> a clip stays frozen on its first frame &mdash; tap the instant it starts to move. It plays out, then resets to frame one.</li>
         <li>Tap before the cue and the trial restarts as a false start.</li>
       </ul>
 
@@ -285,6 +328,7 @@
 
   <!-- ===== Stage ===== -->
   <section id="stage" class="hidden" aria-live="assertive">
+    <video id="cueVideo" class="cue-video" src="StopTheClock.mp4" muted playsinline preload="auto"></video>
     <div class="counter" id="counter"></div>
     <div class="stage-main" id="stageMain">Get ready</div>
     <div class="stage-sub" id="stageSub"></div>
@@ -318,6 +362,7 @@
     start: document.getElementById("start"),
     startBtn: document.getElementById("startBtn"),
     stage: document.getElementById("stage"),
+    cueVideo: document.getElementById("cueVideo"),
     stageMain: document.getElementById("stageMain"),
     stageSub: document.getElementById("stageSub"),
     counter: document.getElementById("counter"),
@@ -333,10 +378,12 @@
     visual: "Visual",
     audio: "Audio",
     both: "Both at once",
-    random: "Random mix"
+    random: "Random mix",
+    video: "Referee view"
   };
 
-  var CUE_LABEL = { visual: "👁 Visual", audio: "🔊 Audio", both: "👁🔊 Both" };
+  var CUE_LABEL = { visual: "👁 Visual", audio: "🔊 Audio", both: "👁🔊 Both", video: "Referee view" };
+  var CUE_ICON = { visual: "👁", audio: "🔊", both: "👁🔊", video: "Ref" };
 
   // Times are shown in seconds to three decimals: 280 ms -> "0.280".
   var UNIT = "s";
@@ -446,12 +493,60 @@
     state.falseStarts = 0;
 
     ensureAudio();
+    if (state.mode === "video") resetCueVideo();
 
     el.start.classList.add("hidden");
     el.results.classList.add("hidden");
     el.stage.classList.remove("hidden");
 
     nextTrial();
+  }
+
+  // ---------- Video cue ----------
+  // Rewind to the first frame and hold it there, paused.
+  function resetCueVideo() {
+    var v = el.cueVideo;
+    try { v.pause(); } catch (e) {}
+    try { v.currentTime = 0; } catch (e) {}
+    if (v.readyState < 2) v.load();
+  }
+
+  function playCueVideo() {
+    var v = el.cueVideo;
+    // Clear the hint text; the stage stays black and the clip is the cue.
+    setStage("go", "", "");
+    try { v.currentTime = 0; } catch (e) {}
+
+    var marked = false;
+    function mark() {
+      if (marked) return;
+      marked = true;
+      state.t0 = performance.now();
+    }
+    // Prefer the first painted video frame; fall back to the playing event.
+    if (typeof v.requestVideoFrameCallback === "function") {
+      v.requestVideoFrameCallback(mark);
+    }
+    v.addEventListener("playing", mark, { once: true });
+
+    var p = v.play();
+    if (p && typeof p.catch === "function") p.catch(function () {});
+  }
+
+  // Let the clip finish and snap back to frame one, then continue.
+  function afterCueVideo(fn) {
+    var v = el.cueVideo;
+    if (v.ended || v.paused) { setTimeout(fn, 500); return; }
+    var done = false;
+    function go() {
+      if (done) return;
+      done = true;
+      clearTimeout(safety);
+      v.removeEventListener("ended", go);
+      setTimeout(fn, 500);
+    }
+    var safety = setTimeout(go, 6000);
+    v.addEventListener("ended", go);
   }
 
   function pickCue() {
@@ -474,9 +569,12 @@
     state.phase = "waiting";
     state.cueThisTrial = pickCue();
 
+    if (state.mode === "video") resetCueVideo();
+
     // In random mix, a per-trial hint would give the cue away.
     var hint = state.mode === "random" ? "Watch and listen." : cueHint(state.cueThisTrial);
-    setStage("waiting", "Wait…", hint);
+    // In referee view the clip fills the stage, so no "Wait…" text over it.
+    setStage("waiting", state.mode === "video" ? "" : "Wait…", hint);
     el.counter.textContent = "Trial " + state.trial + " / " + TOTAL;
 
     var delay = DELAY_MIN + Math.random() * (DELAY_MAX - DELAY_MIN);
@@ -487,12 +585,20 @@
   function cueHint(cue) {
     if (cue === "audio") return "Audio trial — screen won't change. Listen for the whistle.";
     if (cue === "both") return "Watch and listen.";
+    if (cue === "video") return "Tap when the referee signal stop the clock.";
     return "Watch for green.";
   }
 
   function fireCue() {
     state.phase = "cue";
     var cue = state.cueThisTrial;
+
+    if (cue === "video") {
+      // playCueVideo sets state.t0 on the first painted frame.
+      state.t0 = performance.now();
+      playCueVideo();
+      return;
+    }
 
     if (cue === "visual" || cue === "both") {
       setStage("go", "TAP NOW", "");
@@ -529,6 +635,14 @@
       stopCueSound();
       state.results.push({ ms: ms, cue: state.cueThisTrial });
       state.phase = "result";
+
+      if (state.cueThisTrial === "video") {
+        // Keep the clip on screen; it plays out and resets to frame one.
+        setStage("result", toSecs(ms) + " " + UNIT, "");
+        afterCueVideo(nextTrial);
+        return;
+      }
+
       setStage("result", toSecs(ms) + " " + UNIT, resultRemark(ms));
       setTimeout(nextTrial, 1000);
       return;
@@ -544,7 +658,7 @@
   }
 
   function setStage(cls, main, sub) {
-    el.stage.className = cls;
+    el.stage.className = state.mode === "video" ? cls + " has-video" : cls;
     el.stageMain.textContent = main;
     el.stageSub.textContent = sub || "";
   }
@@ -552,6 +666,7 @@
   // ---------- Results ----------
   function showResults() {
     state.phase = "done";
+    try { el.cueVideo.pause(); } catch (e) {}
     el.stage.classList.add("hidden");
     el.results.classList.remove("hidden");
 
@@ -585,7 +700,7 @@
       row.className = "trial-row";
       row.innerHTML =
         '<span class="idx">#' + (i + 1) + '</span>' +
-        '<span title="' + CUE_LABEL[r.cue] + '">' + CUE_LABEL[r.cue].split(" ")[0] + '</span>' +
+        '<span title="' + CUE_LABEL[r.cue] + '">' + CUE_ICON[r.cue] + '</span>' +
         '<span class="bar-track"><span class="bar-fill" style="width:' + pct + '%"></span></span>' +
         '<span class="ms">' + toSecs(r.ms) + ' s</span>';
       el.trialList.appendChild(row);
@@ -601,6 +716,19 @@
   el.againBtn.addEventListener("click", function () {
     el.results.classList.add("hidden");
     el.start.classList.remove("hidden");
+  });
+
+  // Keep the clip parked on its first frame whenever it loads or finishes.
+  el.cueVideo.addEventListener("loadeddata", function () {
+    if (el.cueVideo.paused) { try { el.cueVideo.currentTime = 0; } catch (e) {} }
+  });
+  el.cueVideo.addEventListener("ended", function () {
+    try { el.cueVideo.pause(); } catch (e) {}
+    try { el.cueVideo.currentTime = 0; } catch (e) {}
+  });
+  // Warm the clip up as soon as the video option is chosen.
+  document.getElementById("modes").addEventListener("change", function (e) {
+    if (e.target.value === "video" && el.cueVideo.readyState < 2) el.cueVideo.load();
   });
 
   el.stage.addEventListener("pointerdown", function (e) {
