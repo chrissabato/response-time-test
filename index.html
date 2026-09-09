@@ -338,9 +338,9 @@
 
   var CUE_LABEL = { visual: "👁 Visual", audio: "🔊 Audio", both: "👁🔊 Both" };
 
-  // Times are shown in seconds to one decimal: 280 ms -> "0.3".
+  // Times are shown in seconds to three decimals: 280 ms -> "0.280".
   var UNIT = "s";
-  function toSecs(ms) { return (ms / 1000).toFixed(1); }
+  function toSecs(ms) { return (ms / 1000).toFixed(3); }
 
   var audioCtx = null;
   var whistleBytes = null;    // raw mp3 bytes, fetched once

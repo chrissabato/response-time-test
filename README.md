@@ -3,7 +3,7 @@
 A single-page website that measures how fast you react to a visual and/or audio cue.
 
 - **5 trials per session**, then session stats (mean / median / best / worst / total) with a per-trial breakdown.
-- Times are shown in **seconds to one decimal**, e.g. `0.3 s`. The Total stat sums all five trials.
+- Times are shown in **seconds to three decimals**, e.g. `0.283 s`. The Total stat sums all five trials.
 - **Cue modes**, chosen before each run: Visual, Audio, Both at once, or Random mix (each trial independently visual / audio / both).
 - **Input:** click or tap anywhere on the stage.
 - Random 2–6 s wait before each cue. Tapping early is flagged as a false start and the trial restarts (not counted).
