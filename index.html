@@ -338,9 +338,9 @@
 
   var CUE_LABEL = { visual: "👁 Visual", audio: "🔊 Audio", both: "👁🔊 Both" };
 
-  // Times are shown in tenths of a second (deciseconds): 280 ms -> "2.8".
-  var UNIT = "×0.1s";
-  function toTenths(ms) { return (ms / 100).toFixed(1); }
+  // Times are shown in seconds to one decimal: 280 ms -> "0.3".
+  var UNIT = "s";
+  function toSecs(ms) { return (ms / 1000).toFixed(1); }
 
   var audioCtx = null;
   var whistleBytes = null;    // raw mp3 bytes, fetched once
@@ -529,7 +529,7 @@
       stopCueSound();
       state.results.push({ ms: ms, cue: state.cueThisTrial });
       state.phase = "result";
-      setStage("result", toTenths(ms) + " " + UNIT, resultRemark(ms));
+      setStage("result", toSecs(ms) + " " + UNIT, resultRemark(ms));
       setTimeout(nextTrial, 1000);
       return;
     }
@@ -573,7 +573,7 @@
     ].forEach(function (row) {
       var d = document.createElement("div");
       d.className = "stat" + (row[2] ? " " + row[2] : "");
-      d.innerHTML = '<div class="value">' + toTenths(row[1]) + ' <small>' + UNIT + '</small></div>' +
+      d.innerHTML = '<div class="value">' + toSecs(row[1]) + ' <small>' + UNIT + '</small></div>' +
                     '<div class="label">' + row[0] + '</div>';
       el.stats.appendChild(d);
     });
@@ -587,7 +587,7 @@
         '<span class="idx">#' + (i + 1) + '</span>' +
         '<span title="' + CUE_LABEL[r.cue] + '">' + CUE_LABEL[r.cue].split(" ")[0] + '</span>' +
         '<span class="bar-track"><span class="bar-fill" style="width:' + pct + '%"></span></span>' +
-        '<span class="ms">' + toTenths(r.ms) + '</span>';
+        '<span class="ms">' + toSecs(r.ms) + ' s</span>';
       el.trialList.appendChild(row);
     });
 
