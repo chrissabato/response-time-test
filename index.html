@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reaction Time Test</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-ink: #04283a;
+    --border: #334155;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #app {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---------- Start / results panels ---------- */
+  .panel {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin: 0 0 4px;
+  }
+
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 0.95rem;
+  }
+
+  h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+
+  fieldset { border: 0; margin: 0 0 22px; padding: 0; }
+
+  .modes {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .modes label {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 10px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.92rem;
+    user-select: none;
+  }
+
+  .modes input { position: absolute; opacity: 0; pointer-events: none; }
+
+  .modes label:has(input:checked) {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .modes label:has(input:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .instructions {
+    margin: 0 0 24px;
+    padding-left: 18px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.55;
+  }
+
+  .instructions li { margin-bottom: 4px; }
+
+  button {
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--accent-ink);
+    background: var(--accent);
+    border: 0;
+    border-radius: 10px;
+  }
+
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+  }
+
+  /* ---------- Stage ---------- */
+  #stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    /* No transition: instant repaint keeps the "go" moment accurate. */
+    background: var(--bg);
+  }
+
+  #stage.waiting { background: #7f1d1d; color: #fecaca; }
+  #stage.go      { background: #15803d; color: #dcfce7; }
+  #stage.tooSoon { background: #b91c1c; color: #fee2e2; }
+  #stage.result  { background: var(--bg); color: var(--text); }
+
+  .stage-main {
+    font-size: clamp(2rem, 9vw, 4rem);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+  }
+
+  .stage-sub {
+    margin-top: 14px;
+    font-size: clamp(1rem, 3.5vw, 1.25rem);
+    opacity: 0.85;
+    max-width: 22ch;
+  }
+
+  .counter {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 14px 18px;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: currentColor;
+    opacity: 0.75;
+  }
+
+  /* ---------- Results ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  .stat {
+    background: var(--panel-2);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .stat .value { font-size: 1.6rem; font-weight: 700; }
+  .stat .value small { font-size: 0.9rem; font-weight: 500; color: var(--muted); }
+  .stat .label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .trial-list { margin-bottom: 22px; display: grid; gap: 8px; }
+
+  .trial-row {
+    display: grid;
+    grid-template-columns: 4ch 3ch 1fr auto;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  .trial-row .idx { color: var(--muted); }
+
+  .bar-track {
+    background: var(--panel-2);
+    border-radius: 6px;
+    height: 10px;
+    overflow: hidden;
+  }
+
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 6px; }
+
+  .trial-row .ms { font-variant-numeric: tabular-nums; }
+
+  .note {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin: 0 0 22px;
+  }
+
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== Start screen ===== -->
+  <section id="start" class="panel">
+    <div class="card">
+      <h1>Reaction Time Test</h1>
+      <p class="tagline">Five trials. Tap as fast as you can when the cue fires.</p>
+
+      <fieldset>
+        <h2>Cue mode</h2>
+        <div class="modes" id="modes">
+          <label><input type="radio" name="mode" value="visual" checked> Visual</label>
+          <label><input type="radio" name="mode" value="audio"> Audio</label>
+          <label><input type="radio" name="mode" value="both"> Both at once</label>
+          <label><input type="radio" name="mode" value="random"> Random mix</label>
+        </div>
+      </fieldset>
+
+      <ul class="instructions">
+        <li><strong>Visual:</strong> the screen turns green &mdash; tap the moment it does.</li>
+        <li><strong>Audio:</strong> the screen stays dark &mdash; tap when you hear the whistle.</li>
+        <li><strong>Both:</strong> green flash and beep together.</li>
+        <li><strong>Random mix:</strong> each trial is independently visual, audio, or both.</li>
+        <li>Tap before the cue and the trial restarts as a false start.</li>
+      </ul>
+
+      <button class="btn-primary" id="startBtn">Start test</button>
+    </div>
+  </section>
+
+  <!-- ===== Stage ===== -->
+  <section id="stage" class="hidden" aria-live="assertive">
+    <div class="counter" id="counter"></div>
+    <div class="stage-main" id="stageMain">Get ready</div>
+    <div class="stage-sub" id="stageSub"></div>
+  </section>
+
+  <!-- ===== Results ===== -->
+  <section id="results" class="panel hidden">
+    <div class="card">
+      <h1>Results</h1>
+      <p class="tagline" id="resultsMode"></p>
+
+      <div class="stats" id="stats"></div>
+      <div class="trial-list" id="trialList"></div>
+      <p class="note" id="falseStartNote"></p>
+
+      <button class="btn-primary" id="againBtn">Run again</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var TOTAL = 5;
+  var DELAY_MIN = 2000;
+  var DELAY_MAX = 6000;
+
+  var el = {
+    start: document.getElementById("start"),
+    startBtn: document.getElementById("startBtn"),
+    stage: document.getElementById("stage"),
+    stageMain: document.getElementById("stageMain"),
+    stageSub: document.getElementById("stageSub"),
+    counter: document.getElementById("counter"),
+    results: document.getElementById("results"),
+    resultsMode: document.getElementById("resultsMode"),
+    stats: document.getElementById("stats"),
+    trialList: document.getElementById("trialList"),
+    falseStartNote: document.getElementById("falseStartNote"),
+    againBtn: document.getElementById("againBtn")
+  };
+
+  var MODE_LABEL = {
+    visual: "Visual",
+    audio: "Audio",
+    both: "Both at once",
+    random: "Random mix"
+  };
+
+  var CUE_LABEL = { visual: "👁 Visual", audio: "🔊 Audio", both: "👁🔊 Both" };
+
+  var audioCtx = null;
+  var whistleBytes = null;    // raw mp3 bytes, fetched once
+  var whistleBuffer = null;   // decoded AudioBuffer
+  var whistleOffset = 0;      // seconds of leading silence to skip
+  var whistleFailed = false;  // fall back to a synth tone if true
+
+  // Fetch the cue sound immediately; decoding waits for the AudioContext.
+  fetch("whistle.mp3").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.arrayBuffer();
+  }).then(function (buf) {
+    whistleBytes = buf;
+  }).catch(function () {
+    whistleFailed = true;
+  });
+
+  var state = {
+    mode: "visual",
+    phase: "idle",   // idle | waiting | cue | result | done
+    trial: 0,
+    results: [],      // { ms, cue }
+    falseStarts: 0,
+    cueThisTrial: null,
+    t0: 0,
+    timeoutId: null
+  };
+
+  // ---------- Audio ----------
+  function ensureAudio() {
+    if (!audioCtx) {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+
+    // Decode the whistle once we have a context and the bytes are in.
+    if (audioCtx && whistleBytes && !whistleBuffer && !whistleFailed) {
+      var bytes = whistleBytes;
+      whistleBytes = null;
+      audioCtx.decodeAudioData(bytes).then(function (decoded) {
+        whistleBuffer = decoded;
+        whistleOffset = findSoundStart(decoded);
+      }).catch(function () {
+        whistleFailed = true;
+      });
+    }
+  }
+
+  // First moment the waveform rises above near-silence, backed off slightly.
+  function findSoundStart(buffer) {
+    var data = buffer.getChannelData(0);
+    var threshold = 0.02;
+    for (var i = 0; i < data.length; i++) {
+      if (Math.abs(data[i]) > threshold) {
+        return Math.max(0, i / buffer.sampleRate - 0.005);
+      }
+    }
+    return 0;
+  }
+
+  var activeSound = null;
+
+  function stopCueSound() {
+    if (activeSound) {
+      try { activeSound.stop(); } catch (e) {}
+      activeSound = null;
+    }
+  }
+
+  function playCueSound() {
+    if (!audioCtx) return;
+    if (whistleBuffer) {
+      var src = audioCtx.createBufferSource();
+      src.buffer = whistleBuffer;
+      src.connect(audioCtx.destination);
+      src.onended = function () { if (activeSound === src) activeSound = null; };
+      src.start(0, whistleOffset);
+      activeSound = src;
+      return;
+    }
+    // Fallback: short synth tone if the whistle failed to load or decode.
+    var now = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // ---------- Flow ----------
+  function startTest() {
+    var checked = document.querySelector('input[name="mode"]:checked');
+    state.mode = checked ? checked.value : "visual";
+    state.phase = "idle";
+    state.trial = 0;
+    state.results = [];
+    state.falseStarts = 0;
+
+    ensureAudio();
+
+    el.start.classList.add("hidden");
+    el.results.classList.add("hidden");
+    el.stage.classList.remove("hidden");
+
+    nextTrial();
+  }
+
+  function pickCue() {
+    if (state.mode === "random") {
+      return ["visual", "audio", "both"][Math.floor(Math.random() * 3)];
+    }
+    return state.mode;
+  }
+
+  function nextTrial() {
+    state.trial += 1;
+    if (state.trial > TOTAL) {
+      showResults();
+      return;
+    }
+    beginWait();
+  }
+
+  function beginWait() {
+    state.phase = "waiting";
+    state.cueThisTrial = pickCue();
+
+    setStage("waiting", "Wait…", cueHint(state.cueThisTrial));
+    el.counter.textContent = "Trial " + state.trial + " / " + TOTAL;
+
+    var delay = DELAY_MIN + Math.random() * (DELAY_MAX - DELAY_MIN);
+    clearTimeout(state.timeoutId);
+    state.timeoutId = setTimeout(fireCue, delay);
+  }
+
+  function cueHint(cue) {
+    if (cue === "audio") return "Audio trial — screen won't change. Listen for the whistle.";
+    if (cue === "both") return "Watch and listen.";
+    return "Watch for green.";
+  }
+
+  function fireCue() {
+    state.phase = "cue";
+    var cue = state.cueThisTrial;
+
+    if (cue === "visual" || cue === "both") {
+      setStage("go", "TAP NOW", "");
+    }
+    if (cue === "audio" || cue === "both") {
+      playCueSound();
+    }
+    // For audio-only the screen deliberately stays in the "waiting" style.
+
+    // Fallback timestamp in case of an impossibly fast tap before the frame below.
+    state.t0 = performance.now();
+
+    // Refine: capture the timestamp just after the browser paints this frame.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        state.t0 = performance.now();
+      });
+    });
+  }
+
+  function onResponse() {
+    if (state.phase === "waiting") {
+      // False start.
+      clearTimeout(state.timeoutId);
+      state.falseStarts += 1;
+      state.phase = "result";
+      setStage("tooSoon", "Too soon!", "Wait for the cue. Restarting this trial…");
+      setTimeout(beginWait, 1100);
+      return;
+    }
+
+    if (state.phase === "cue") {
+      var ms = Math.round(performance.now() - state.t0);
+      stopCueSound();
+      state.results.push({ ms: ms, cue: state.cueThisTrial });
+      state.phase = "result";
+      setStage("result", ms + " ms", resultRemark(ms));
+      setTimeout(nextTrial, 1000);
+      return;
+    }
+  }
+
+  function resultRemark(ms) {
+    if (ms < 180) return "Lightning.";
+    if (ms < 250) return "Fast.";
+    if (ms < 350) return "Solid.";
+    if (ms < 500) return "A touch slow.";
+    return "Room to improve.";
+  }
+
+  function setStage(cls, main, sub) {
+    el.stage.className = cls;
+    el.stageMain.textContent = main;
+    el.stageSub.textContent = sub || "";
+  }
+
+  // ---------- Results ----------
+  function showResults() {
+    state.phase = "done";
+    el.stage.classList.add("hidden");
+    el.results.classList.remove("hidden");
+
+    var times = state.results.map(function (r) { return r.ms; });
+    var sorted = times.slice().sort(function (a, b) { return a - b; });
+    var n = sorted.length;
+    var mean = Math.round(times.reduce(function (a, b) { return a + b; }, 0) / n);
+    var median = n % 2 ? sorted[(n - 1) / 2] : Math.round((sorted[n / 2 - 1] + sorted[n / 2]) / 2);
+    var best = sorted[0];
+    var worst = sorted[n - 1];
+
+    el.resultsMode.textContent = MODE_LABEL[state.mode] + " — " + n + " trials";
+
+    el.stats.innerHTML = "";
+    [
+      ["Mean", mean], ["Median", median], ["Best", best], ["Worst", worst]
+    ].forEach(function (pair) {
+      var d = document.createElement("div");
+      d.className = "stat";
+      d.innerHTML = '<div class="value">' + pair[1] + ' <small>ms</small></div>' +
+                    '<div class="label">' + pair[0] + '</div>';
+      el.stats.appendChild(d);
+    });
+
+    el.trialList.innerHTML = "";
+    state.results.forEach(function (r, i) {
+      var pct = Math.max(6, Math.round((r.ms / worst) * 100));
+      var row = document.createElement("div");
+      row.className = "trial-row";
+      row.innerHTML =
+        '<span class="idx">#' + (i + 1) + '</span>' +
+        '<span title="' + CUE_LABEL[r.cue] + '">' + CUE_LABEL[r.cue].split(" ")[0] + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:' + pct + '%"></span></span>' +
+        '<span class="ms">' + r.ms + ' ms</span>';
+      el.trialList.appendChild(row);
+    });
+
+    el.falseStartNote.textContent = state.falseStarts
+      ? state.falseStarts + " false start" + (state.falseStarts > 1 ? "s" : "") + " this session (not counted)."
+      : "No false starts. Clean run.";
+  }
+
+  // ---------- Events ----------
+  el.startBtn.addEventListener("click", startTest);
+  el.againBtn.addEventListener("click", function () {
+    el.results.classList.add("hidden");
+    el.start.classList.remove("hidden");
+  });
+
+  el.stage.addEventListener("pointerdown", function (e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    onResponse();
+  });
+})();
+</script>
+</body>
+</html>
