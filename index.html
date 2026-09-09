@@ -474,7 +474,9 @@
     state.phase = "waiting";
     state.cueThisTrial = pickCue();
 
-    setStage("waiting", "Wait…", cueHint(state.cueThisTrial));
+    // In random mix, a per-trial hint would give the cue away.
+    var hint = state.mode === "random" ? "Watch and listen." : cueHint(state.cueThisTrial);
+    setStage("waiting", "Wait…", hint);
     el.counter.textContent = "Trial " + state.trial + " / " + TOTAL;
 
     var delay = DELAY_MIN + Math.random() * (DELAY_MAX - DELAY_MIN);
